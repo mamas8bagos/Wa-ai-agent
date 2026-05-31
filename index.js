@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -16,16 +17,16 @@ Karakter pemilik:
 - Bahasa Indonesia santai tapi sopan
 - Kadang pakai emoji yang sesuai
 - Balasan singkat tapi berkesan
-- Jika ada pertanyaan jawab dengan antusias
-- Jika ada curhatan tunjukkan empati genuine
 
 Balas SEBAGAI pemilik akun, bukan sebagai AI.
 Maksimal 3-4 kalimat, natural seperti chat WA.`;
 
 app.post('/webhook', async (req, res) => {
+  res.sendStatus(200);
   try {
-    const { message, sender } = req.body;
-    if (!message || !sender) return res.sendStatus(200);
+    const message = req.body.message;
+    const sender = req.body.sender;
+    if (!message || !sender) return;
 
     const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
       model: 'llama3-8b-8192',
@@ -49,13 +50,10 @@ app.post('/webhook', async (req, res) => {
       headers: { Authorization: FONNTE_TOKEN }
     });
 
-    res.sendStatus(200);
   } catch (err) {
     console.error(err.message);
-    res.sendStatus(500);
   }
 });
 
 app.get('/', (req, res) => res.send('WA AI Agent aktif!'));
-
 app.listen(3000, () => console.log('Server jalan di port 3000'));
