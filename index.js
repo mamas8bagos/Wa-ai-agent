@@ -4,7 +4,7 @@ const app = express();
 app.use(express.json());
 
 const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
-const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 const KARAKTER = `Kamu adalah AI yang membalas WhatsApp atas nama pemilik akun.
 
@@ -27,20 +27,20 @@ app.post('/webhook', async (req, res) => {
     const { message, sender } = req.body;
     if (!message || !sender) return res.sendStatus(200);
 
-    const response = await axios.post('https://api.anthropic.com/v1/messages', {
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      system: KARAKTER,
-      messages: [{ role: 'user', content: message }]
+    const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+      model: 'llama3-8b-8192',
+      messages: [
+        { role: 'system', content: KARAKTER },
+        { role: 'user', content: message }
+      ]
     }, {
       headers: {
-        'x-api-key': CLAUDE_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
       }
     });
 
-    const reply = response.data.content[0].text;
+    const reply = response.data.choices[0].message.content;
 
     await axios.post('https://api.fonnte.com/send', {
       target: sender,
