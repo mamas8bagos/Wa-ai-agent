@@ -1,135 +1,177 @@
-const express = require('express');
-const axios = require('axios');
+const express = require("express");
+const axios = require("axios");
+
 const app = express();
+
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const OWNER_NUMBER = process.env.OWNER_NUMBER;
+const GROK_API_KEY = process.env.GROK_API_KEY;
+const FONTE_TOKEN = process.env.FONTE_TOKEN;
 
-const KARAKTER = `Kamu adalah admin WhatsApp toko "Bagos Cell" yang melayani pelanggan.
-
-KARAKTER KAMU:
-- Ngobrol seperti manusia asli, tidak kaku sama sekali
-- Ramah, hangat, tulus melayani dari hati
-- Sesekali bercanda ringan tapi tetap sopan
-- Pakai bahasa santai sesuai gaya pelanggan
-- Kalau pelanggan pakai bahasa Jawa → balas Jawa
-- Kalau pelanggan pakai bahasa Inggris → balas Inggris
-- JANGAN jawab yang tidak ada datanya — bilang ramah "maaf belum tersedia"
-- JANGAN lebay dan JANGAN terlalu formal
-
-RUMUS HARGA JUAL:
-- Modal 5rb–39rb → harga jual = modal + Rp 3.000
-- Modal 40rb–49rb → harga jual = modal + Rp 4.000
-- Modal 50rb ke atas → harga jual = modal + 10% dari modal
-
-DAFTAR PRODUK & HARGA JUAL:
-
-PULSA (semua operator: Telkomsel, XL, Indosat, Tri, Smartfren):
-- Pulsa 5rb → Rp 8.000
-- Pulsa 10rb → Rp 13.000
-- Pulsa 15rb → Rp 18.000
-- Pulsa 20rb → Rp 23.000
-- Pulsa 25rb → Rp 28.000
-- Pulsa 30rb → Rp 33.000
-- Pulsa 35rb → Rp 38.000
-- Pulsa 40rb → Rp 44.000
-- Pulsa 45rb → Rp 49.000
-- Pulsa 50rb → Rp 55.000
-- Pulsa 75rb → Rp 82.500
-- Pulsa 100rb → Rp 110.000
-
-TOKEN LISTRIK (PLN):
-- Token 20rb → Rp 23.000
-- Token 25rb → Rp 28.000
-- Token 30rb → Rp 33.000
-- Token 40rb → Rp 44.000
-- Token 50rb → Rp 55.000
-- Token 100rb → Rp 110.000
-- Token 200rb → Rp 220.000
-- Token 500rb → Rp 550.000
-
-E-WALLET (GoPay, OVO, Dana, ShopeePay):
-- Top up 10rb → Rp 13.000
-- Top up 20rb → Rp 23.000
-- Top up 25rb → Rp 28.000
-- Top up 30rb → Rp 33.000
-- Top up 50rb → Rp 55.000
-- Top up 100rb → Rp 110.000
-- Top up 200rb → Rp 220.000
-
-CARA MELAYANI:
-1. Sapa pelanggan dengan hangat & natural
-2. Tanya kebutuhan jika belum jelas
-3. Kasih info harga dengan santai
-4. Jika mau order → tanya: nama, nomor/ID tujuan, nominal, operator/jenis
-5. Jika data lengkap → konfirmasi & bilang tunggu diproses admin
-6. Jika tidak ada di daftar → bilang ramah "maaf belum tersedia kak"
-7. JANGAN mengarang harga yang tidak ada di daftar
-
-JIKA ORDER SUDAH LENGKAP (ada nama + nomor tujuan + nominal + operator):
-Wajib tambahkan tag [ORDER] di AWAL balasan!
-
- ke 081234567890 ya. Tunggu sebentar diproses! 🚀"`;
-
-app.post('/webhook', async (req, res) => {
-  res.sendStatus(200);
-  try {
-    const message = req.body.message;
-    const sender = req.body.sender;
-    if (!message || !sender) return;
-
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          { role: 'system', content: KARAKTER },
-          { role: 'user', content: message }
-        ],
-        max_tokens: 300,
-        temperature: 0.85
+async function kirimKeGrok(systemPrompt, pesanUser) {
+  const response = await axios.post(
+    "https://api.x.ai/v1/chat/completions",
+    {
+      model: "grok-3",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        {
+          role: "user",
+          content: pesanUser,
+        },
+      ],
+      temperature: 0.8,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${GROK_API_KEY}`,
+        "Content-Type": "application/json",
       },
-      {
-        headers: {
-          Authorization: `Bearer ${GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    let reply = response.data.choices[0].message.content;
-    const isOrder = reply.includes('[ORDER]');
-    reply = reply.replace('[ORDER]', '').trim();
-
-    await axios.post(
-      'https://api.fonnte.com/send',
-      { target: sender, message: reply },
-      { headers: { Authorization: FONNTE_TOKEN } }
-    );
-
-    if (isOrder && OWNER_NUMBER) {
-      const notif =
-`🔔 *ORDER MASUK - BAGOS CELL!*
-
-👤 Dari: ${sender}
-📝 Pesanan: ${message}
-
-⚡ Segera proses ya!`;
-
-      await axios.post(
-        'https://api.fonnte.com/send',
-        { target: OWNER_NUMBER, message: notif },
-        { headers: { Authorization: FONNTE_TOKEN } }
-      );
     }
+  );
 
-  } catch (err) {
-    console.error(err.message);
+  return response.data.choices[0].message.content;
+}
+
+async function kirimWA(target, pesan) {
+  await axios.post(
+    "https://api.fonte.id/send",
+    {
+      target,
+      message: pesan,
+    },
+    {
+      headers: {
+        Authorization: FONTE_TOKEN,
+      },
+    }
+  );
+}
+
+/* =========================
+   AGENT PENJUAL PULSA
+========================= */
+
+const PROMPT_PENJUAL = `
+Kamu adalah admin penjualan pulsa dan paket data profesional.
+
+Karakter:
+- Ramah.
+- Cepat merespon.
+- Sopan.
+- Fokus membantu pelanggan.
+
+Tugas:
+- Menjual pulsa semua operator.
+- Menjual paket data.
+- Menawarkan produk digital terkait.
+- Jika pelanggan bertanya, jawab dengan jelas.
+- Jika pelanggan belum membeli, tawarkan produk yang relevan.
+- Jangan pernah marah.
+- Gunakan bahasa Indonesia yang natural.
+`;
+
+/* =========================
+   AGENT PEMBELI KRITIS
+========================= */
+
+const PROMPT_PEMBELI = `
+Kamu adalah calon pembeli yang sangat kritis.
+
+Karakter:
+- Tegas.
+- Curiga terhadap klaim berlebihan.
+- Sering bertanya.
+- Selalu meminta detail.
+- Tidak mudah percaya.
+
+Aturan:
+- Jangan menggunakan kata kasar.
+- Jangan mengancam.
+- Jangan menghina.
+
+Tujuan:
+- Menggali informasi sebanyak mungkin.
+- Menanyakan harga.
+- Menanyakan kualitas.
+- Menanyakan keunggulan produk.
+- Menanyakan bukti dan testimoni.
+- Menanyakan garansi.
+- Menanyakan kelemahan produk.
+
+Jika jawaban lawan bicara terlalu singkat,
+lanjutkan dengan pertanyaan lanjutan.
+`;
+
+/* =========================
+   WEBHOOK PENJUAL
+========================= */
+
+app.post("/penjual", async (req, res) => {
+  try {
+    const pesan =
+      req.body.message ||
+      req.body.content ||
+      "";
+
+    const pengirim =
+      req.body.sender ||
+      req.body.from ||
+      "";
+
+    const jawaban = await kirimKeGrok(
+      PROMPT_PENJUAL,
+      pesan
+    );
+
+    await kirimWA(pengirim, jawaban);
+
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("ERROR");
   }
 });
 
-app.get('/', (req, res) => res.send('Bagos Cell AI Agent aktif! 🚀'));
-app.listen(3000, () => console.log('Bagos Cell server jalan di port 3000'));
+/* =========================
+   WEBHOOK PEMBELI
+========================= */
+
+app.post("/pembeli", async (req, res) => {
+  try {
+    const pesan =
+      req.body.message ||
+      req.body.content ||
+      "";
+
+    const pengirim =
+      req.body.sender ||
+      req.body.from ||
+      "";
+
+    const jawaban = await kirimKeGrok(
+      PROMPT_PEMBELI,
+      pesan
+    );
+
+    await kirimWA(pengirim, jawaban);
+
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("ERROR");
+  }
+});
+
+app.get("/", (req, res) => {
+  res.send("WA AI Agent Online");
+});
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
