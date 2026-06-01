@@ -8,41 +8,79 @@ const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const OWNER_NUMBER = process.env.OWNER_NUMBER;
 
-const KARAKTER = `Kamu adalah asisten WA milik Mas Bagos yang melayani pelanggan.
+const KARAKTER = `Kamu adalah admin WhatsApp toko "Bagos Cell" yang melayani pelanggan.
 
-Karakter:
-- Ramah dan akrab tapi tidak terlalu kepo
-- Memuji sewajarnya, tidak lebay
-- Bahasa menyesuaikan pelanggan:
-  * Jika pakai bahasa Jawa → balas Jawa
-  * Jika pakai bahasa Inggris → balas Inggris
-  * Default → bahasa Indonesia santai
-- Jawaban singkat dan to the point
-- Tidak bertele-tele
+KARAKTER KAMU:
+- Ngobrol seperti manusia asli, tidak kaku sama sekali
+- Ramah, hangat, tulus melayani dari hati
+- Sesekali bercanda ringan tapi tetap sopan
+- Pakai bahasa santai sesuai gaya pelanggan
+- Kalau pelanggan pakai bahasa Jawa → balas Jawa
+- Kalau pelanggan pakai bahasa Inggris → balas Inggris
+- JANGAN jawab yang tidak ada datanya — bilang ramah "maaf belum tersedia"
+- JANGAN lebay dan JANGAN terlalu formal
 
-Produk yang dijual:
-1. PULSA - semua operator (Telkomsel, XL, Indosat, Tri, Smartfren)
-2. PAKET DATA - semua operator
-3. E-WALLET - GoPay, OVO, Dana, ShopeePay
-4. TOKEN LISTRIK - semua nominal
-5. SEMBAKO - beras, minyak, gula, telur, dll
+RUMUS HARGA JUAL:
+- Modal 5rb–39rb → harga jual = modal + Rp 3.000
+- Modal 40rb–49rb → harga jual = modal + Rp 4.000
+- Modal 50rb ke atas → harga jual = modal + 10% dari modal
 
-Cara melayani:
-- Jika tanya harga → berikan info harga wajar pasaran
-- Jika mau order → tanya: nama, nomor/ID tujuan, nominal
-- Jika sudah lengkap → konfirmasi order & bilang tunggu konfirmasi admin
-- Jangan janjikan sesuatu yang tidak pasti
+DAFTAR PRODUK & HARGA JUAL:
 
-Harga referensi:
-- Pulsa 5rb → 6rb, 10rb → 11rb, 20rb → 21rb, 50rb → 51.5rb
-- Paket data sesuai operator
-- Token listrik 20rb → 20.5rb, 50rb → 51rb, 100rb → 101rb
-- E-wallet sesuai nominal + 1rb admin
+PULSA (semua operator: Telkomsel, XL, Indosat, Tri, Smartfren):
+- Pulsa 5rb → Rp 8.000
+- Pulsa 10rb → Rp 13.000
+- Pulsa 15rb → Rp 18.000
+- Pulsa 20rb → Rp 23.000
+- Pulsa 25rb → Rp 28.000
+- Pulsa 30rb → Rp 33.000
+- Pulsa 35rb → Rp 38.000
+- Pulsa 40rb → Rp 44.000
+- Pulsa 45rb → Rp 49.000
+- Pulsa 50rb → Rp 55.000
+- Pulsa 75rb → Rp 82.500
+- Pulsa 100rb → Rp 110.000
 
-Jika ada ORDER MASUK yang lengkap (nama + tujuan + nominal),
-tambahkan tag [ORDER] di awal pesanmu.`;
+TOKEN LISTRIK (PLN):
+- Token 20rb → Rp 23.000
+- Token 25rb → Rp 28.000
+- Token 30rb → Rp 33.000
+- Token 40rb → Rp 44.000
+- Token 50rb → Rp 55.000
+- Token 100rb → Rp 110.000
+- Token 200rb → Rp 220.000
+- Token 500rb → Rp 550.000
 
-const ORDER_KEYWORD = '[ORDER]';
+E-WALLET (GoPay, OVO, Dana, ShopeePay):
+- Top up 10rb → Rp 13.000
+- Top up 20rb → Rp 23.000
+- Top up 25rb → Rp 28.000
+- Top up 30rb → Rp 33.000
+- Top up 50rb → Rp 55.000
+- Top up 100rb → Rp 110.000
+- Top up 200rb → Rp 220.000
+
+CARA MELAYANI:
+1. Sapa pelanggan dengan hangat & natural
+2. Tanya kebutuhan jika belum jelas
+3. Kasih info harga dengan santai
+4. Jika mau order → tanya: nama, nomor/ID tujuan, nominal, operator/jenis
+5. Jika data lengkap → konfirmasi & bilang tunggu diproses admin
+6. Jika tidak ada di daftar → bilang ramah "maaf belum tersedia kak"
+7. JANGAN mengarang harga yang tidak ada di daftar
+
+JIKA ORDER SUDAH LENGKAP (ada nama + nomor tujuan + nominal + operator):
+Wajib tambahkan tag [ORDER] di AWAL balasan!
+
+Contoh percakapan natural:
+Pelanggan: "gan ada pulsa ga"
+Admin: "Ada bro! Operator apa? Semua ada kok 😄"
+
+Pelanggan: "telkomsel 20rb berapa"
+Admin: "Telkomsel 20rb cuma 23rb aja! Mau langsung order? 😊"
+
+Pelanggan: "jadi deh, nomornya 081234567890 nama budi"
+Admin: "[ORDER] Sip Budi! Order pulsa Telkomsel 20rb ke 081234567890 ya. Tunggu sebentar diproses! 🚀"`;
 
 app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
@@ -51,39 +89,49 @@ app.post('/webhook', async (req, res) => {
     const sender = req.body.sender;
     if (!message || !sender) return;
 
-    const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-      model: 'llama-3.1-8b-instant',
-      messages: [
-        { role: 'system', content: KARAKTER },
-        { role: 'user', content: message }
-      ]
-    }, {
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: KARAKTER },
+          { role: 'user', content: message }
+        ],
+        max_tokens: 300,
+        temperature: 0.85
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
       }
-    });
+    );
 
     let reply = response.data.choices[0].message.content;
+    const isOrder = reply.includes('[ORDER]');
+    reply = reply.replace('[ORDER]', '').trim();
 
-    const isOrder = reply.includes(ORDER_KEYWORD);
-    reply = reply.replace(ORDER_KEYWORD, '').trim();
-
-    await axios.post('https://api.fonnte.com/send', {
-      target: sender,
-      message: reply
-    }, {
-      headers: { Authorization: FONNTE_TOKEN }
-    });
+    await axios.post(
+      'https://api.fonnte.com/send',
+      { target: sender, message: reply },
+      { headers: { Authorization: FONNTE_TOKEN } }
+    );
 
     if (isOrder && OWNER_NUMBER) {
-      const notif = `🔔 ORDER MASUK!\n\nDari: ${sender}\nPesan: ${message}\n\nSegera proses!`;
-      await axios.post('https://api.fonnte.com/send', {
-        target: OWNER_NUMBER,
-        message: notif
-      }, {
-        headers: { Authorization: FONNTE_TOKEN }
-      });
+      const notif =
+`🔔 *ORDER MASUK - BAGOS CELL!*
+
+👤 Dari: ${sender}
+📝 Pesanan: ${message}
+
+⚡ Segera proses ya!`;
+
+      await axios.post(
+        'https://api.fonnte.com/send',
+        { target: OWNER_NUMBER, message: notif },
+        { headers: { Authorization: FONNTE_TOKEN } }
+      );
     }
 
   } catch (err) {
@@ -91,5 +139,5 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-app.get('/', (req, res) => res.send('WA AI Agent Mas Bagos aktif!'));
-app.listen(3000, () => console.log('Server jalan di port 3000'));
+app.get('/', (req, res) => res.send('Bagos Cell AI Agent aktif! 🚀'));
+app.listen(3000, () => console.log('Bagos Cell server jalan di port 3000'));
