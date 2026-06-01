@@ -6,108 +6,110 @@ const app = express();
 app.use(express.json());
 
 const GROK_API_KEY = process.env.GROK_API_KEY;
-const FONTE_TOKEN = process.env.FONTE_TOKEN;
 
-async function kirimKeGrok(systemPrompt, pesanUser) {
-  const response = await axios.post(
-    "https://api.x.ai/v1/chat/completions",
-    {
-      model: "grok-3",
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        {
-          role: "user",
-          content: pesanUser,
-        },
-      ],
-      temperature: 0.8,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${GROK_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  return response.data.choices[0].message.content;
-}
-
-async function kirimWA(target, pesan) {
-  await axios.post(
-    "https://api.fonte.id/send",
-    {
-      target,
-      message: pesan,
-    },
-    {
-      headers: {
-        Authorization: FONTE_TOKEN,
-      },
-    }
-  );
-}
+const TOKEN_PENJUAL = process.env.FONTE_TOKEN_PENJUAL;
+const TOKEN_PEMBELI = process.env.FONTE_TOKEN_PEMBELI;
 
 /* =========================
-   AGENT PENJUAL PULSA
+   PROMPT AGENT PENJUAL
 ========================= */
 
 const PROMPT_PENJUAL = `
-Kamu adalah admin penjualan pulsa dan paket data profesional.
+Kamu adalah admin penjual pulsa, paket data, token listrik dan produk digital.
 
 Karakter:
-- Ramah.
-- Cepat merespon.
-- Sopan.
-- Fokus membantu pelanggan.
+- Ramah
+- Sopan
+- Profesional
+- Aktif menawarkan produk
 
-Tugas:
-- Menjual pulsa semua operator.
-- Menjual paket data.
-- Menawarkan produk digital terkait.
-- Jika pelanggan bertanya, jawab dengan jelas.
+Aturan:
+- Jawab singkat dan jelas.
 - Jika pelanggan belum membeli, tawarkan produk yang relevan.
-- Jangan pernah marah.
+- Selalu bersikap baik.
 - Gunakan bahasa Indonesia yang natural.
+- Fokus membantu pelanggan melakukan pembelian.
 `;
 
 /* =========================
-   AGENT PEMBELI KRITIS
+   PROMPT AGENT PEMBELI
 ========================= */
 
 const PROMPT_PEMBELI = `
 Kamu adalah calon pembeli yang sangat kritis.
 
 Karakter:
-- Tegas.
-- Curiga terhadap klaim berlebihan.
-- Sering bertanya.
-- Selalu meminta detail.
-- Tidak mudah percaya.
+- Tegas
+- Kritis
+- Banyak bertanya
+- Tidak mudah percaya
 
 Aturan:
 - Jangan menggunakan kata kasar.
-- Jangan mengancam.
 - Jangan menghina.
+- Jangan mengancam.
+- Selalu tanyakan detail produk.
+- Selalu tanyakan harga.
+- Selalu tanyakan kelebihan dan kekurangan produk.
+- Jika jawaban lawan bicara kurang jelas, lanjutkan dengan pertanyaan baru.
 
 Tujuan:
-- Menggali informasi sebanyak mungkin.
-- Menanyakan harga.
-- Menanyakan kualitas.
-- Menanyakan keunggulan produk.
-- Menanyakan bukti dan testimoni.
-- Menanyakan garansi.
-- Menanyakan kelemahan produk.
-
-Jika jawaban lawan bicara terlalu singkat,
-lanjutkan dengan pertanyaan lanjutan.
+Menggali informasi sebanyak mungkin sebelum membeli.
 `;
 
 /* =========================
-   WEBHOOK PENJUAL
+   GROK
+========================= */
+
+async function askGrok(prompt, userMessage) {
+  const response = await axios.post(
+    "https://api.x.ai/v1/chat/completions",
+    {
+      model: "grok-3",
+      temperature: 0.8,
+      messages: [
+        {
+          role: "system",
+          content: prompt
+        },
+        {
+          role: "user",
+          content: userMessage
+        }
+      ]
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${GROK_API_KEY}`,
+        "Content-Type": "application/json"
+      }
+    }
+  );
+
+  return response.data.choices[0].message.content;
+}
+
+/* =========================
+   FONTE SEND
+========================= */
+
+async function sendWhatsApp(target, message, token) {
+  await axios.post(
+    "https://api.fonte.id/send",
+    {
+      target: target,
+      message: message
+    },
+    {
+      headers: {
+        Authorization: token
+      }
+    }
+  );
+}
+
+/* =========================
+   AGENT PENJUAL
 ========================= */
 
 app.post("/penjual", async (req, res) => {
@@ -122,22 +124,31 @@ app.post("/penjual", async (req, res) => {
       req.body.from ||
       "";
 
-    const jawaban = await kirimKeGrok(
+    if (!pesan || !pengirim) {
+      return res.status(200).send("ignored");
+    }
+
+    const jawaban = await askGrok(
       PROMPT_PENJUAL,
       pesan
     );
 
-    await kirimWA(pengirim, jawaban);
+    await sendWhatsApp(
+      pengirim,
+      jawaban,
+      TOKEN_PENJUAL
+    );
 
-    res.status(200).send("OK");
+    res.status(200).send("ok");
+
   } catch (error) {
     console.error(error);
-    res.status(500).send("ERROR");
+    res.status(500).send("error");
   }
 });
 
 /* =========================
-   WEBHOOK PEMBELI
+   AGENT PEMBELI
 ========================= */
 
 app.post("/pembeli", async (req, res) => {
@@ -152,19 +163,32 @@ app.post("/pembeli", async (req, res) => {
       req.body.from ||
       "";
 
-    const jawaban = await kirimKeGrok(
+    if (!pesan || !pengirim) {
+      return res.status(200).send("ignored");
+    }
+
+    const jawaban = await askGrok(
       PROMPT_PEMBELI,
       pesan
     );
 
-    await kirimWA(pengirim, jawaban);
+    await sendWhatsApp(
+      pengirim,
+      jawaban,
+      TOKEN_PEMBELI
+    );
 
-    res.status(200).send("OK");
+    res.status(200).send("ok");
+
   } catch (error) {
     console.error(error);
-    res.status(500).send("ERROR");
+    res.status(500).send("error");
   }
 });
+
+/* =========================
+   STATUS
+========================= */
 
 app.get("/", (req, res) => {
   res.send("WA AI Agent Online");
