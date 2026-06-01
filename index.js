@@ -72,15 +72,7 @@ CARA MELAYANI:
 JIKA ORDER SUDAH LENGKAP (ada nama + nomor tujuan + nominal + operator):
 Wajib tambahkan tag [ORDER] di AWAL balasan!
 
-Contoh percakapan natural:
-Pelanggan: "gan ada pulsa ga"
-Admin: "Ada bro! Operator apa? Semua ada kok 😄"
-
-Pelanggan: "telkomsel 20rb berapa"
-Admin: "Telkomsel 20rb cuma 23rb aja! Mau langsung order? 😊"
-
-Pelanggan: "jadi deh, nomornya 081234567890 nama budi"
-Admin: "[ORDER] Sip Budi! Order pulsa Telkomsel 20rb ke 081234567890 ya. Tunggu sebentar diproses! 🚀"`;
+ ke 081234567890 ya. Tunggu sebentar diproses! 🚀"`;
 
 app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
